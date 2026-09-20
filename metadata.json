@@ -1,0 +1,6 @@
+{
+  "name": "LK Lottery Master",
+  "description": "Sri Lanka's professional lottery master app for NLB & DLB lotteries with Micro-QR scanner, AI damaged ticket scanner, lucky prediction engine, 6-month historical results, and user accounts.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
