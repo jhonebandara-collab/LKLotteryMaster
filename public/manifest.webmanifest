@@ -1,0 +1,32 @@
+{
+  "name": "LK Lottery Master — ලොතරැයි ප්‍රතිඵල",
+  "short_name": "LK Lottery",
+  "description": "ශ්‍රී ලංකා NLB සහ DLB ලොතරැයි ප්‍රතිඵල බලන්න, ටිකට් check කරන්න, ඇත්ත prize amount එක දැනගන්න.",
+  "lang": "si",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1420",
+  "theme_color": "#f1c40f",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LK Lottery Master : app icon
+  Note: the original SVG used JSX comment syntax, which is NOT valid XML
+  and made the icon fail to render. Converted to standard XML comments.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"
+     role="img" aria-labelledby="lkmIconTitle">
+  <title id="lkmIconTitle">LK Lottery Master</title>
+
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f1c40f"/>
+      <stop offset="100%" stop-color="#d4ac0d"/>
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1a2530"/>
+      <stop offset="100%" stop-color="#0f1420"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background box with rounded corners -->
+  <rect width="512" height="512" rx="110" fill="url(#bgGrad)" stroke="#f1c40f" stroke-width="8"/>
+
+  <!-- Central design: lottery ticket + winning star + LK monogram -->
+  <g transform="translate(106, 80)">
+    <!-- Ticket shape -->
+    <rect x="20" y="40" width="260" height="180" rx="20" fill="none"
+          stroke="url(#goldGrad)" stroke-width="10" stroke-dasharray="15 10"/>
+
+    <!-- Winning star -->
+    <path d="M150 70 L175 125 L235 130 L190 170 L205 230 L150 195 L95 230 L110 170 L65 130 L125 125 Z"
+          fill="url(#goldGrad)" opacity="0.9"/>
+
+    <!-- LK monogram -->
+    <text x="150" y="150" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+          font-size="52" fill="#0f1420" text-anchor="middle">LK</text>
+  </g>
+
+  <!-- Bottom badge -->
+  <text x="256" y="380" font-family="Arial, Helvetica, sans-serif" font-weight="bold"
+        font-size="36" fill="url(#goldGrad)" text-anchor="middle" letter-spacing="3">LOTTERY MASTER</text>
+</svg>
