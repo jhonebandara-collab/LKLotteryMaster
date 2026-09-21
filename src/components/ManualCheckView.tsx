@@ -1,408 +1,469 @@
-import React, { useState, useEffect } from 'react';
-import { Calendar, Hash, CheckCircle, Search, RefreshCw, Sparkles, QrCode, AlertCircle } from 'lucide-react';
-import { ALL_LOTTERIES, getLotteryBySlug } from '../data/lotteries';
-import { evaluateLotteryPrize } from '../data/prizes';
-import { LotteryDefinition, PrizeEvaluationResult, TicketCheckInput, ZodiacSign } from '../types';
-import { incrementCheckCounter } from '../services/storageService';
+import React, { useState, useMemo } from 'react';
+import { Search, Sparkles, Trophy, Calendar, Hash, ArrowRight, RefreshCw, CheckCircle } from 'lucide-react';
+import { ALL_LOTTERIES, getLotteryBySlug, ZODIAC_SIGNS } from '../data/lotteriesData';
+import { LotteryInfo, LotteryDraw, Language } from '../types/lottery';
+import { evaluateLotteryPrize, formatRs } from '../utils/prizeCalculator';
+import { speakResult, playWinCelebrationSound, playLoseTone } from '../utils/audioFeedback';
 
 interface ManualCheckViewProps {
-  lang: 'si' | 'en';
-  onCheckFinished: (result: PrizeEvaluationResult, ticket: TicketCheckInput) => void;
-  onOpenScanner: (mode?: 'qr' | 'ai') => void;
-  onRequestAd: () => void;
+  language: Language;
+  soundEnabled: boolean;
+  onRecordHistory: (record: any) => void;
 }
 
-const ZODIAC_LIST: ZodiacSign[] = [
-  'ARIES', 'TAURUS', 'GEMINI', 'CANCER', 
-  'LEO', 'VIRGO', 'LIBRA', 'SCORPIO', 
-  'SAGITTARIUS', 'CAPRICORN', 'AQUARIUS', 'PISCES'
-];
-
 export const ManualCheckView: React.FC<ManualCheckViewProps> = ({
-  lang,
-  onCheckFinished,
-  onOpenScanner,
-  onRequestAd
+  language,
+  soundEnabled,
+  onRecordHistory
 }) => {
-  const isSinhala = lang === 'si';
+  const [selectedSlug, setSelectedSlug] = useState<string>('govisetha');
+  const [selectedDrawIndex, setSelectedDrawIndex] = useState<number>(0);
+  const [letter, setLetter] = useState<string>('W');
+  const [zodiac, setZodiac] = useState<string>('ARIES');
+  const [superNumber, setSuperNumber] = useState<string>('15');
+  const [numbers, setNumbers] = useState<string[]>(['03', '32', '36', '62']);
+  const [subGameIdx, setSubGameIdx] = useState<number>(0);
+  const [evaluatedResult, setEvaluatedResult] = useState<any | null>(null);
 
-  const [selectedSlug, setSelectedSlug] = useState<string>('mahajana-sampatha');
-  const [searchMode, setSearchMode] = useState<'date' | 'drawNo'>('date');
-  const [selectedDate, setSelectedDate] = useState<string>('2026-09-18');
-  const [selectedDrawNo, setSelectedDrawNo] = useState<string>('6314');
-
-  const [ticketLetter, setTicketLetter] = useState<string>('J');
-  const [ticketZodiac, setTicketZodiac] = useState<string>('LEO');
-  const [ticketSuperNumber, setTicketSuperNumber] = useState<string>('12');
-  const [ticketNumbers, setTicketNumbers] = useState<string[]>(['3', '5', '9', '0', '8', '1']);
-
-  const currentLottery = getLotteryBySlug(selectedSlug) || ALL_LOTTERIES[0];
-
-  // Whenever lottery changes, reinitialize numbers
-  useEffect(() => {
-    const lot = getLotteryBySlug(selectedSlug) || ALL_LOTTERIES[0];
-    const latest = lot.draws[0];
-
-    if (latest) {
-      setSelectedDate(latest.date);
-      setSelectedDrawNo(latest.drawNo);
-      setTicketLetter(latest.letter || 'A');
-      setTicketZodiac(latest.zodiac || 'LEO');
-      setTicketSuperNumber(latest.superNumber || '10');
-      setTicketNumbers(latest.numbers ? [...latest.numbers] : Array(lot.numberCount).fill('0'));
-    } else {
-      setTicketNumbers(Array(lot.numberCount).fill('0'));
-    }
+  const lottery: LotteryInfo = useMemo(() => {
+    return getLotteryBySlug(selectedSlug) || ALL_LOTTERIES[0];
   }, [selectedSlug]);
 
-  const handleNumberChange = (index: number, val: string) => {
-    const clean = val.replace(/\D/g, '').slice(0, currentLottery.digitWidth);
-    const updated = [...ticketNumbers];
-    updated[index] = clean;
-    setTicketNumbers(updated);
+  const currentDraw: LotteryDraw | undefined = useMemo(() => {
+    return lottery.draws[selectedDrawIndex] || lottery.draws[0];
+  }, [lottery, selectedDrawIndex]);
 
-    // Auto-advance focus to next input
-    if (clean.length === currentLottery.digitWidth && index < currentLottery.numberCount - 1) {
-      const nextInput = document.getElementById(`digit-box-${index + 1}`);
-      if (nextInput) nextInput.focus();
+  // Handle lottery selection change
+  const handleLotteryChange = (slug: string) => {
+    setSelectedSlug(slug);
+    setSelectedDrawIndex(0);
+    setEvaluatedResult(null);
+
+    const lot = getLotteryBySlug(slug) || ALL_LOTTERIES[0];
+    const firstDraw = lot.draws[0] as LotteryDraw | undefined;
+
+    // A lottery with no downloaded draws (e.g. Waasi) must not crash the view.
+    if (!firstDraw) {
+      setLetter('A');
+      setZodiac('ARIES');
+      setSuperNumber('10');
+      setNumbers(['01', '02', '03', '04']);
+      return;
     }
+
+    // Seed defaults based on lottery format
+    setLetter(firstDraw.letter || 'A');
+    setZodiac(firstDraw.zodiac || 'ARIES');
+    setSuperNumber(firstDraw.superNumber ? String(firstDraw.superNumber) : '10');
+
+    const ballCount = lot.ballCount || 4;
+    const sampleBalls = firstDraw.numbers.slice(0, ballCount);
+    while (sampleBalls.length < ballCount) sampleBalls.push('01');
+    setNumbers(sampleBalls);
   };
 
-  const handlePerformCheck = () => {
-    // Check ad trigger (every 3rd free check)
-    const { shouldShowAd } = incrementCheckCounter();
-    if (shouldShowAd) {
-      onRequestAd();
-    }
+  const handleNumberChange = (index: number, val: string) => {
+    const clean = val.replace(/\D/g, '').slice(0, 2);
+    const updated = [...numbers];
+    updated[index] = clean;
+    setNumbers(updated);
+  };
 
-    // Find the relevant draw by date or drawNo
-    let matchedDraw = currentLottery.draws.find(d => 
-      searchMode === 'date' ? d.date === selectedDate : d.drawNo === selectedDrawNo
+  const handleCheck = () => {
+    if (!currentDraw) return;
+    const evalRes = evaluateLotteryPrize(
+      lottery.slug,
+      currentDraw,
+      {
+        letter: lottery.hasLetter ? letter.toUpperCase() : null,
+        zodiac: lottery.hasZodiac ? zodiac.toUpperCase() : null,
+        superNumber: lottery.hasSuperNumber ? superNumber : null,
+        numbers: numbers.map((n) => n.padStart(2, '0'))
+      },
+      subGameIdx
     );
 
-    const now = new Date();
-    const currentIsoDate = now.toISOString().slice(0, 10);
+    setEvaluatedResult(evalRes);
 
-    // Check if draw is pending
-    const isFuture = searchMode === 'date' 
-      ? selectedDate > currentIsoDate || (selectedDate === currentIsoDate && now.getHours() < 21)
-      : Number(selectedDrawNo) > Number(currentLottery.draws[0]?.drawNo || '0');
-
-    if (!matchedDraw) {
-      if (isFuture) {
-        const pendingResult: PrizeEvaluationResult = {
-          won: false,
-          isDrawPending: true,
-          drawPendingDate: selectedDate,
-          tier: null,
-          prizeLabel: null,
-          prizeAmountRs: 0,
-          prizeAmountFormatted: null,
-          note: `දිනුම් ඇදීම තවම සිදු වී නොමැත. ${selectedDate} දින රාත්‍රී 9:30 ට නිල ප්‍රතිඵල නිකුත් වූ පසු පරීක්ෂා කළ හැක.`
-        };
-
-        onCheckFinished(pendingResult, {
-          slug: currentLottery.slug,
-          date: selectedDate,
-          drawNo: selectedDrawNo,
-          letter: currentLottery.hasLetter ? ticketLetter : undefined,
-          zodiac: currentLottery.hasZodiac ? ticketZodiac : undefined,
-          superNumber: currentLottery.hasSuperNumber ? ticketSuperNumber : undefined,
-          numbers: ticketNumbers
-        });
-        return;
-      }
-
-      // If past draw not in archive, fallback to latest
-      matchedDraw = currentLottery.draws[0];
+    if (evalRes.won) {
+      if (soundEnabled) playWinCelebrationSound();
+    } else {
+      if (soundEnabled) playLoseTone();
     }
 
-    const ticketInput: TicketCheckInput = {
-      slug: currentLottery.slug,
-      date: selectedDate,
-      drawNo: selectedDrawNo,
-      letter: currentLottery.hasLetter ? ticketLetter : undefined,
-      zodiac: currentLottery.hasZodiac ? ticketZodiac : undefined,
-      superNumber: currentLottery.hasSuperNumber ? ticketSuperNumber : undefined,
-      numbers: ticketNumbers
-    };
+    if (soundEnabled) {
+      speakResult(
+        evalRes.won,
+        lottery.name,
+        evalRes.prizeLabel,
+        evalRes.prizeAmountFormatted,
+        language
+      );
+    }
 
-    const evaluation = evaluateLotteryPrize(currentLottery.slug, matchedDraw, ticketInput);
-    onCheckFinished(evaluation, ticketInput);
+    // Save to history
+    onRecordHistory({
+      id: 'manual_' + Date.now(),
+      timestamp: Date.now(),
+      lotterySlug: lottery.slug,
+      lotteryName: lottery.name,
+      provider: lottery.provider,
+      drawNo: currentDraw.drawNo,
+      date: currentDraw.date,
+      scannedNumbers: numbers.map((n) => n.padStart(2, '0')),
+      scannedLetter: lottery.hasLetter ? letter.toUpperCase() : null,
+      scannedZodiac: lottery.hasZodiac ? zodiac.toUpperCase() : null,
+      scannedSuperNumber: lottery.hasSuperNumber ? superNumber : null,
+      officialDraw: currentDraw,
+      prizeEvaluation: evalRes,
+      scanMethod: 'manual'
+    });
   };
 
+  const t = {
+    en: {
+      heading: 'Manual Ticket Verification',
+      sub: 'Select lottery, draw number, and enter ticket values to calculate your winnings.',
+      selectLottery: 'Select Lottery',
+      selectDraw: 'Select Draw',
+      drawNo: 'Draw #',
+      date: 'Date',
+      letter: 'English Letter',
+      zodiac: 'Zodiac Sign',
+      superNumber: 'Super Number',
+      ticketNumbers: 'Ticket Ball Numbers',
+      checkBtn: 'Calculate Prize & Check Result',
+      resultHeader: 'Verification Result',
+      officialWinning: 'Official Winning Numbers',
+      matched: 'Matched Balls',
+      prize: 'Prize Won'
+    },
+    si: {
+      heading: 'අතින් ලොතරැයි පරීක්ෂාව',
+      sub: 'ලොතරැයිය සහ දිනුම් වාරය තෝරා, ඔබගේ ටිකට්පත් අංක ඇතුළත් කර ක්ෂණිකව ජයග්‍රහණ පරීක්ෂා කරන්න.',
+      selectLottery: 'ලොතරැයිය තෝරන්න',
+      selectDraw: 'දිනුම් වාරය තෝරන්න',
+      drawNo: 'දිනුම් වාරය',
+      date: 'දිනය',
+      letter: 'ඉංග්‍රීසි අකුර',
+      zodiac: 'ලග්නය',
+      superNumber: 'සුපිරි අංකය',
+      ticketNumbers: 'ටිකට්පතේ අංක',
+      checkBtn: 'ප්‍රතිඵලය පරීක්ෂා කරන්න',
+      resultHeader: 'ප්‍රතිඵල විස්තරය',
+      officialWinning: 'නිල ජයග්‍රාහී අංක',
+      matched: 'ගැලපුණු අංක',
+      prize: 'දිනාගත් ත්‍යාගය'
+    },
+    ta: {
+      heading: 'கைமுறை லாட்டரி சரிபார்ப்பு',
+      sub: 'லாட்டரியைத் தேர்ந்தெடுத்து உங்கள் டிக்கெட் எண்களை உள்ளிட்டு வெற்றியைச் சரிபார்க்கவும்.',
+      selectLottery: 'லாட்டரியைத் தேர்ந்தெடுக்கவும்',
+      selectDraw: 'குலுக்கல் எண்',
+      drawNo: 'குலுக்கல் #',
+      date: 'தேதி',
+      letter: 'ஆங்கில எழுத்து',
+      zodiac: 'ராசி',
+      superNumber: 'சூப்பர் எண்',
+      ticketNumbers: 'டிக்கெட் எண்கள்',
+      checkBtn: 'முடிவைச் சரிபார்க்கவும்',
+      resultHeader: 'சரிபார்ப்பு முடிவு',
+      officialWinning: 'வெற்றி எண்கள்',
+      matched: 'பொருந்திய எண்கள்',
+      prize: 'பரிசு தொகை'
+    }
+  }[language];
+
   return (
-    <div className="space-y-6">
-      {/* Dual Scanner Buttons Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 1. Quick QR Continuous Camera Banner */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-400 p-4 sm:p-5 text-slate-950 shadow-xl shadow-amber-500/10 flex flex-col justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-11 h-11 rounded-xl bg-slate-950 text-amber-400 flex items-center justify-center shrink-0 shadow-md">
-              <QrCode className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-black tracking-tight">
-                  {isSinhala ? 'නොනවතින Micro-QR Scanner' : 'Continuous QR Scanner'}
-                </h3>
-                <span className="px-2 py-0.5 bg-slate-950 text-amber-300 font-bold text-[10px] rounded-full">
-                  0.2s Fast
-                </span>
-              </div>
-              <p className="text-xs font-semibold text-slate-900/85 mt-1 leading-snug">
-                {isSinhala 
-                  ? 'එක දිගට ටිකට්පත් ස්කෑන් කරන්න. එක් ටිකට්පතක් ස්කෑන් වූ පසු තත්පර 5ක් ප්‍රතිඵලය පෙන්වා ස්වයංක්‍රීයව ඊළඟ ටිකට්පත කියවයි.' 
-                  : 'Scans continuously! Displays result for 5s with Rupees audio and automatically advances to the next ticket.'}
-              </p>
-            </div>
+    <div className="w-full max-w-4xl mx-auto px-4 py-6">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <Search className="w-5 h-5" />
           </div>
-
-          <button
-            onClick={() => onOpenScanner('qr')}
-            className="w-full py-2.5 bg-slate-950 hover:bg-slate-900 text-amber-300 font-black rounded-xl text-xs sm:text-sm transition shadow-lg active:scale-95 flex items-center justify-center gap-2"
-          >
-            <QrCode className="w-4 h-4" />
-            <span>{isSinhala ? 'QR Scanner අරඹන්න' : 'Launch QR Scanner'}</span>
-          </button>
-        </div>
-
-        {/* 2. Lottery Scan (AI Camera for Damaged/Blurred Tickets) */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 p-4 sm:p-5 border border-purple-500/40 text-white shadow-xl flex flex-col justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-500/40 text-purple-300 flex items-center justify-center shrink-0 shadow-md">
-              <Sparkles className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-black tracking-tight text-purple-200">
-                  {isSinhala ? 'Lottery Scan (AI Vision)' : 'Lottery Scan (AI Vision)'}
-                </h3>
-                <span className="px-2 py-0.5 bg-purple-500/30 text-purple-300 font-bold text-[10px] rounded-full border border-purple-500/40">
-                  Gemini AI
-                </span>
-              </div>
-              {/* Important user-requested note */}
-              <div className="mt-1.5 p-2 rounded-lg bg-amber-950/40 border border-amber-500/40 text-[11px] font-medium text-amber-200 leading-tight">
-                <span className="font-bold">⚠️ {isSinhala ? 'විශේෂ සටහන:' : 'Special Note:'}</span>{' '}
-                {isSinhala 
-                  ? 'QR කේතය ක්‍රියා නොකරන්නේ නම් හෝ ලොතරැයි පත හානි වී (Damaged/Blurred) ඇත්නම් පමණක් මෙය භාවිතා කරන්න. කැමරාවෙන් ඡායාරූපය ගත් වහාම AI මඟින් අංක කියවා නිල දිනුම පෙන්වයි.' 
-                  : 'Use this only if the QR code fails or the ticket is damaged. Camera captures and reads ticket via Gemini Vision in seconds.'}
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => onOpenScanner('ai')}
-            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black rounded-xl text-xs sm:text-sm transition shadow-lg shadow-purple-600/30 active:scale-95 flex items-center justify-center gap-2"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>{isSinhala ? 'Lottery Scan (AI) අරඹන්න' : 'Launch Lottery Scan (AI)'}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Manual Check Card */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
           <div>
-            <h2 className="text-lg font-black text-white flex items-center gap-2">
-              <span>✍️</span> {isSinhala ? 'අතින් අංක දමා පරීක්ෂා කිරීම' : 'Manual Ticket Verification'}
-            </h2>
-            <p className="text-xs text-slate-400">
-              {isSinhala ? 'ලොතරැයිය සහ දිනය හෝ Draw අංකය තෝරා අංක ඇතුළත් කරන්න' : 'Select lottery, pick calendar date or draw number'}
-            </p>
-          </div>
-
-          {/* Search Mode Toggle (Calendar vs Draw No) */}
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto text-xs font-bold">
-            <button
-              onClick={() => setSearchMode('date')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition ${
-                searchMode === 'date' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>{isSinhala ? 'දිනය අනුව (Calendar)' : 'By Date'}</span>
-            </button>
-            <button
-              onClick={() => setSearchMode('drawNo')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition ${
-                searchMode === 'drawNo' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Hash className="w-3.5 h-3.5" />
-              <span>{isSinhala ? 'Draw අංකය අනුව' : 'By Draw #'}</span>
-            </button>
+            <h2 className="text-lg font-bold text-white tracking-tight">{t.heading}</h2>
+            <p className="text-xs text-slate-400">{t.sub}</p>
           </div>
         </div>
 
-        {/* Lottery Selection & Date/Draw Pickers */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Lottery Selection Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           {/* Lottery Selector */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-              {isSinhala ? '1. ලොතරැයිය තෝරන්න (Select Lottery):' : '1. Select Lottery:'}
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              {t.selectLottery}
             </label>
             <select
+              id="select-lottery-dropdown"
               value={selectedSlug}
-              onChange={(e) => setSelectedSlug(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3.5 py-2.5 text-sm font-bold focus:outline-none focus:border-amber-400"
+              onChange={(e) => handleLotteryChange(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-amber-400 focus:outline-none"
             >
-              <optgroup label="ජාතික ලොතරැයි මණ්ඩලය (NLB)">
-                {ALL_LOTTERIES.filter(l => l.provider === 'NLB').map(lot => (
-                  <option key={lot.slug} value={lot.slug}>
-                    {isSinhala ? lot.nameSi : lot.name} ({lot.provider})
+              <optgroup label="National Lotteries Board (NLB)">
+                {ALL_LOTTERIES.filter((l) => l.provider === 'NLB').map((l) => (
+                  <option key={l.slug} value={l.slug}>
+                    {l.name} ({l.code})
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="සංවර්ධන ලොතරැයි මණ්ඩලය (DLB)">
-                {ALL_LOTTERIES.filter(l => l.provider === 'DLB').map(lot => (
-                  <option key={lot.slug} value={lot.slug}>
-                    {isSinhala ? lot.nameSi : lot.name} ({lot.provider})
+              <optgroup label="Development Lotteries Board (DLB)">
+                {ALL_LOTTERIES.filter((l) => l.provider === 'DLB').map((l) => (
+                  <option key={l.slug} value={l.slug}>
+                    {l.name} ({l.code})
                   </option>
                 ))}
               </optgroup>
             </select>
           </div>
 
-          {/* Calendar Date OR Draw Number Input */}
+          {/* Draw Selector */}
           <div>
-            {searchMode === 'date' ? (
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span>{isSinhala ? '2. දිනය තෝරන්න (Calendar Date):' : '2. Pick Draw Date:'}</span>
-                  <span className="text-[10px] text-amber-400 font-normal">
-                    {isSinhala ? 'පසුගිය මාස 6ම ඇතුළත්' : 'Full 6-mo archive'}
-                  </span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    max="2026-12-31"
-                    min="2026-01-01"
-                    onChange={(e) => {
-                      setSelectedDate(e.target.value);
-                      const found = currentLottery.draws.find(d => d.date === e.target.value);
-                      if (found) setSelectedDrawNo(found.drawNo);
-                    }}
-                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3.5 py-2 text-sm font-mono font-bold focus:outline-none focus:border-amber-400"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
-                  <span>{isSinhala ? '2. Draw අංකය (Draw Number):' : '2. Draw Number:'}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">
-                    නවතම: #{currentLottery.draws[0]?.drawNo}
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={selectedDrawNo}
-                  onChange={(e) => {
-                    setSelectedDrawNo(e.target.value);
-                    const found = currentLottery.draws.find(d => d.drawNo === e.target.value);
-                    if (found) setSelectedDate(found.date);
-                  }}
-                  placeholder="Draw No (e.g. 6314)"
-                  className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold focus:outline-none focus:border-amber-400"
-                />
-              </div>
-            )}
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
+              {t.selectDraw}
+            </label>
+            <select
+              id="select-draw-dropdown"
+              value={selectedDrawIndex}
+              onChange={(e) => {
+                const idx = Number(e.target.value);
+                setSelectedDrawIndex(idx);
+                setEvaluatedResult(null);
+              }}
+              className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-amber-400 focus:outline-none"
+            >
+              {lottery.draws.map((d, i) => (
+                <option key={d.drawNo} value={i}>
+                  {t.drawNo}: {d.drawNo} ({d.date}) — Jackpot: {formatRs(d.jackpotAmount || null)}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Input Boxes for Ticket Numbers */}
-        <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
-              {isSinhala ? '3. ඔබගේ ප්‍රවේශපත්‍ර අංක ඇතුළත් කරන්න:' : '3. Enter Your Ticket Numbers:'}
-            </span>
-            <span className="text-[11px] text-slate-400">
-              {currentLottery.numberCount} Numbers ({currentLottery.digitWidth === 1 ? 'Single Digits' : '2-Digit Numbers'})
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5">
-            {/* Letter input box if lottery has letter */}
-            {currentLottery.hasLetter && (
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-amber-400 mb-1">
-                  {isSinhala ? 'අකුර' : 'Letter'}
-                </span>
+        {/* Input Controls for Ticket Components */}
+        <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 mb-6 space-y-4">
+          <div className="flex flex-wrap gap-4 items-center">
+            {/* English Letter */}
+            {lottery.hasLetter && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase mb-1">
+                  {t.letter}
+                </label>
                 <input
+                  id="ticket-letter-input"
                   type="text"
                   maxLength={1}
-                  value={ticketLetter}
-                  onChange={(e) => setTicketLetter(e.target.value.toUpperCase().slice(0, 1))}
-                  className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-900 border-2 border-amber-500/60 focus:border-amber-400 text-white font-black text-center text-lg sm:text-xl rounded-xl focus:outline-none shadow-inner"
+                  value={letter}
+                  onChange={(e) => setLetter(e.target.value.toUpperCase())}
+                  className="w-14 h-12 bg-slate-900 border border-slate-700 rounded-xl text-center text-lg font-bold text-amber-400 uppercase focus:ring-2 focus:ring-amber-400 focus:outline-none"
                 />
               </div>
             )}
 
-            {/* Zodiac selector if lottery has zodiac */}
-            {currentLottery.hasZodiac && (
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-amber-400 mb-1">
-                  {isSinhala ? 'රාශිය' : 'Zodiac'}
-                </span>
+            {/* Zodiac Sign */}
+            {lottery.hasZodiac && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase mb-1">
+                  {t.zodiac}
+                </label>
                 <select
-                  value={ticketZodiac}
-                  onChange={(e) => setTicketZodiac(e.target.value)}
-                  className="h-12 sm:h-14 bg-slate-900 border-2 border-amber-500/60 focus:border-amber-400 text-white font-bold text-xs sm:text-sm px-2 rounded-xl focus:outline-none"
+                  id="ticket-zodiac-select"
+                  value={zodiac}
+                  onChange={(e) => setZodiac(e.target.value)}
+                  className="h-12 bg-slate-900 border border-slate-700 rounded-xl px-3 text-sm font-bold text-purple-300 focus:ring-2 focus:ring-purple-400 focus:outline-none"
                 >
-                  {ZODIAC_LIST.map(z => (
-                    <option key={z} value={z}>{z}</option>
+                  {ZODIAC_SIGNS.map((z) => (
+                    <option key={z} value={z}>
+                      {z}
+                    </option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Super Number input if lottery has super number */}
-            {currentLottery.hasSuperNumber && (
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] font-bold text-amber-400 mb-1">Super #</span>
+            {/* Super Number */}
+            {lottery.hasSuperNumber && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase mb-1">
+                  {t.superNumber}
+                </label>
                 <input
+                  id="ticket-super-input"
                   type="text"
                   maxLength={2}
-                  value={ticketSuperNumber}
-                  onChange={(e) => setTicketSuperNumber(e.target.value.replace(/\D/g, '').slice(0, 2))}
-                  className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-900 border-2 border-amber-500/60 focus:border-amber-400 text-white font-black text-center text-base sm:text-lg rounded-xl focus:outline-none"
+                  value={superNumber}
+                  onChange={(e) => setSuperNumber(e.target.value.replace(/\D/g, ''))}
+                  className="w-14 h-12 bg-slate-900 border border-amber-500/40 rounded-xl text-center text-lg font-bold text-amber-300 focus:ring-2 focus:ring-amber-400 focus:outline-none"
                 />
               </div>
             )}
 
-            {/* Number boxes */}
-            <div className="flex flex-wrap items-center gap-2">
-              {ticketNumbers.map((val, idx) => (
-                <div key={idx} className="flex flex-col items-center">
-                  <span className="text-[10px] font-semibold text-slate-400 mb-1">#{idx + 1}</span>
+            {/* Ball Numbers */}
+            <div className="flex-1">
+              <label className="block text-[11px] font-semibold text-slate-400 uppercase mb-1">
+                {t.ticketNumbers} ({lottery.ballCount} numbers)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {numbers.map((num, i) => (
                   <input
-                    id={`digit-box-${idx}`}
+                    key={i}
+                    id={`ticket-ball-${i}`}
                     type="text"
-                    inputMode="numeric"
-                    maxLength={currentLottery.digitWidth}
-                    value={val}
-                    onChange={(e) => handleNumberChange(idx, e.target.value)}
-                    className="w-11 h-12 sm:w-13 sm:h-14 bg-slate-900 border border-slate-700 focus:border-amber-400 text-amber-300 font-mono font-black text-center text-base sm:text-lg rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+                    maxLength={2}
+                    value={num}
+                    onChange={(e) => handleNumberChange(i, e.target.value)}
+                    className="w-12 h-12 bg-slate-900 border border-slate-700 rounded-xl text-center text-base font-bold font-mono text-white focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    placeholder="00"
                   />
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
+
+          {/* Subgame selector if Ada Sampatha or Suba Dawasak */}
+          {currentDraw?.subGames && (
+            <div className="pt-2 border-t border-slate-800 flex items-center gap-3">
+              <span className="text-xs text-slate-400 font-medium">Sub Game:</span>
+              {currentDraw.subGames.map((sg, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSubGameIdx(idx)}
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold ${
+                    subGameIdx === idx
+                      ? 'bg-amber-500 text-slate-950 font-bold'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  {sg.title || `Game ${idx + 1}`}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Action Button */}
+        {/* Check Button */}
+        {!currentDraw && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-100">
+            No official draw results are downloaded for this lottery yet, so it cannot be scored automatically.
+            Download fresh results or use the QR scanner once the results are available.
+          </div>
+        )}
+
         <button
-          onClick={handlePerformCheck}
-          className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-base transition shadow-lg shadow-amber-500/25 active:scale-[0.99] flex items-center justify-center gap-2"
+          id="btn-manual-check"
+          onClick={handleCheck}
+          disabled={!currentDraw}
+          className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 hover:from-amber-400 to-emerald-500 hover:to-emerald-400 text-slate-950 font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <CheckCircle className="w-5 h-5" />
-          <span>{isSinhala ? 'දිනුම් ප්‍රතිඵලය පරීක්ෂා කරන්න (Check Prize)' : 'Check Prize Now'}</span>
+          <Sparkles className="w-4 h-4" />
+          <span>{t.checkBtn}</span>
         </button>
+
+        {/* Evaluation Output Card */}
+        {evaluatedResult && (
+          <div
+            className={`mt-6 p-5 rounded-2xl border transition-all ${
+              evaluatedResult.won
+                ? 'bg-gradient-to-b from-emerald-950/40 to-slate-900 border-emerald-500/40 shadow-xl'
+                : 'bg-slate-950 border-slate-800'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-2">
+                <Trophy
+                  className={`w-6 h-6 ${
+                    evaluatedResult.won ? 'text-amber-400 animate-bounce' : 'text-slate-500'
+                  }`}
+                />
+                <h3 className="font-bold text-base text-white">
+                  {evaluatedResult.won ? evaluatedResult.prizeLabel : 'No Winning Combinations'}
+                </h3>
+              </div>
+              <span
+                className={`text-xs px-2.5 py-1 rounded-full font-bold ${
+                  evaluatedResult.won
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {evaluatedResult.won ? 'WINNER' : 'NO WIN'}
+              </span>
+            </div>
+
+            {/* Prize amount */}
+            {evaluatedResult.won && (
+              <div className="mb-4 p-3.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-center">
+                <div className="text-xs uppercase tracking-wider text-emerald-400 font-semibold">
+                  {t.prize}
+                </div>
+                <div className="text-2xl sm:text-3xl font-black text-white mt-0.5">
+                  {evaluatedResult.prizeAmountFormatted}
+                </div>
+              </div>
+            )}
+
+            {/* Comparison */}
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                <span className="text-slate-400">{t.officialWinning}:</span>
+                <div className="flex items-center gap-1.5">
+                  {currentDraw.letter && (
+                    <span className="w-6 h-6 rounded bg-slate-800 text-amber-400 font-bold flex items-center justify-center">
+                      {currentDraw.letter}
+                    </span>
+                  )}
+                  {currentDraw.zodiac && (
+                    <span className="px-2 h-6 rounded bg-purple-900/60 text-purple-300 font-bold flex items-center justify-center text-[10px]">
+                      {currentDraw.zodiac}
+                    </span>
+                  )}
+                  {currentDraw.superNumber && (
+                    <span className="w-6 h-6 rounded bg-amber-900/50 text-amber-300 font-bold flex items-center justify-center text-[11px]">
+                      ★{currentDraw.superNumber}
+                    </span>
+                  )}
+                  {currentDraw.numbers.map((n, i) => (
+                    <span
+                      key={i}
+                      className="w-6 h-6 rounded bg-slate-800 text-white font-mono font-bold flex items-center justify-center text-[11px]"
+                    >
+                      {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">{t.matched}:</span>
+                <div className="flex items-center gap-1.5">
+                  {evaluatedResult.matchedNumbers.length > 0 ? (
+                    evaluatedResult.matchedNumbers.map((n: string, i: number) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded bg-emerald-500 text-slate-950 font-bold font-mono text-xs"
+                      >
+                        {n}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-slate-500">None</span>
+                  )}
+                  {evaluatedResult.letterMatch && (
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold">
+                      Letter Match
+                    </span>
+                  )}
+                  {evaluatedResult.zodiacMatch && (
+                    <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 text-[10px] font-bold">
+                      Zodiac Match
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

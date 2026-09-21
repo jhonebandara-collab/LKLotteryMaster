@@ -1,35 +1,44 @@
 {
-  "name": "lk-lottery-master",
-  "version": "1.1.0",
+  "name": "react-example",
   "private": true,
-  "description": "Sri Lanka NLB + DLB lottery result checker with real prize tables, AI ticket scanning and subscriptions",
-  "main": "server.js",
-  "engines": {
-    "node": ">=18.17.0"
-  },
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "scrape": "node scraper.js",
-    "sync-draws": "node -e \"console.log(require('./draws-store').syncDraws())\"",
-    "test": "node test.js",
-    "test:gemini": "node test-gemini.js",
-    "health": "node -e \"fetch('http://localhost:'+(process.env.PORT||3000)+'/api/health').then(r=>r.json()).then(j=>console.log(JSON.stringify(j,null,2))).catch(e=>console.error('Server එක run වෙන්නේ නෑ:',e.message))\""
+    "dev": "tsx server.ts",
+    "dev:https": "node scripts/make-cert.mjs && cross-env HOST=0.0.0.0 HTTPS=1 tsx server.ts",
+    "cert": "node scripts/make-cert.mjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
+    "clean": "rm -rf dist server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "test": "tsx scripts/self-test.ts"
   },
-  "keywords": [
-    "lottery",
-    "sri-lanka",
-    "nlb",
-    "dlb",
-    "results"
-  ],
-  "license": "UNLICENSED",
   "dependencies": {
-    "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^13.0.3",
-    "cheerio": "^1.0.0",
-    "express": "^4.19.2",
-    "google-auth-library": "^11.0.2",
-    "jsonwebtoken": "^9.0.3",
-    "node-cron": "^4.6.0"
+    "@google/genai": "^2.4.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/canvas-confetti": "^1.9.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@zxing/library": "^0.23.0",
+    "canvas-confetti": "^1.9.4",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^0.546.0",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "vite": "^8.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.4.21",
+    "cross-env": "^7.0.3",
+    "esbuild": "^0.28.2",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "^7.0.2",
+    "@types/express": "^4.17.21"
   }
 }

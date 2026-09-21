@@ -1,327 +1,283 @@
-# 🎟️ LK Lottery Master
+# LK Lottery Master PRO
 
-ශ්‍රී ලංකා **NLB** (ජාතික ලොතරැයි මණ්ඩලය) සහ **DLB** (සංවර්ධන ලොතරැයි මණ්ඩලය) ලොතරැයි
-ප්‍රතිඵල බලන්න, ටිකට් check කරන්න, ඇත්ත prize amounts දැනගන්න සහ AI එකෙන් ටිකට් photo
-එකක් scan කරන්න පුළුවන් web app එකක්.
-
-```
-┌──────────────────────────────────────────────────────────┐
-│  ✍️ අතින් Check   📋 අද Results   📷 Scan   🕘 History   👤 ගිණුම │
-└──────────────────────────────────────────────────────────┘
-```
+Sri Lankan lottery (NLB + DLB) ticket checker: QR scanner, AI ticket reader, official prize
+calculator and scan history.
 
 ---
 
-## ⚡ ඉක්මන් පටන් ගැනීම
+## Quick start
 
 ```bash
-npm install          # dependencies install
-npm test             # automated tests 44ක් — Pass: 44 / Fail: 0 වෙන්න ඕන
-npm run scrape       # NLB + DLB එකෙන් ප්‍රතිඵල අරන් data.json එක අලුත් කරන්න
-npm start            # http://localhost:3000
+npm install
+cp .env.example .env      # add your Gemini API keys
+npm run dev               # http://localhost:3000
 ```
 
-Browser එකකින් **http://localhost:3000** open කරන්න. ඒ තරම්.
+### Running it on a phone (important for the QR scanner)
 
-`.env` එකේ credentials කිසිවක් නැතුවත් **ටිකට් පරීක්ෂාව / අලුත්ම ප්‍රතිඵල / මගේ වාර්තා**
-features සම්පූර්ණයෙන්ම වැඩ කරනවා. AI Scan / Google Sign-In / Payments / 🍀 අනුමානය ටික
-විතරයි setup (හෝ plan එකක්) ඕන.
-
-App එකේ **ප්‍රධාන ක්‍රියාව කැමරා Scan** — ඒක tab row එකෙන් එළියේ ලොකු CTA එකක් විදිහට
-තියෙනවා. අනිත් tabs (ටිකට් පරීක්ෂාව · අලුත්ම ප්‍රතිඵල · මගේ වාර්තා · අනුමානය ·
-මගේ ගිණුම · පරිපාලනය) උඩින් තියෙනවා.
-
-### අවශ්‍යතා
-
-| දේ | අවශ්‍යතාව |
-|---|---|
-| Node.js | **18.17 හෝ ඉහළ** (global `fetch` එක පාවිච්චි කරනවා) |
-| Internet | `npm install`, `npm run scrape` සහ AI scan එකට |
-| Browser | Chrome / Edge / Safari (කාමරය + Sinhala fonts) |
-
----
-
-- **🔎 SEO** — හැම ලොතරැයියකටම **සේවාදායකයේදීම HTML හදන** ප්‍රතිඵල පිටු
-  (`/lottery/mahajana-sampatha` වගේ), `/results`, `/how-to-use`, `/about`,
-  `/privacy-policy`, `/refund-policy`, `robots.txt`, `sitemap.xml`, JSON-LD
-  (WebSite · FAQPage · BreadcrumbList · ItemList), Open Graph + Twitter cards.
-  *"ලංකා ලොටරි ප්‍රතිඵල" වගේ සෙවුම්වලට උඩට එන්න ඕන දේ මේකයි — app එකේ
-  ප්‍රධාන පිටුව SPA එකක් නිසා ඒ තනියෙන් SEO වලට ප්‍රමාණවත් නෑ.*
-- **📜 මාස 6ක ඉතිහාසය** — NLB වලට පිටුවකට draw 200ක්, DLB වලට pagination
-  endpoint එකෙන් `පරණ draws`. හැම එකක්ම SQLite `draws` table එකටත් sync වෙනවා
-  (දිනය අනුව ඉක්මන් lookup සඳහා). දැනට **draw ~2900ක් (මාස 6.8)**.
-
-- **🌐 භාෂා තුනක්** — සිංහල · English · தமிழ். Menu එකේ උඩම තියෙන switcher එකෙන්
-  මාරු කරන්න පුළුවන්; තේරීම localStorage එකේ රැකෙනවා. (Chrome: tabs, buttons,
-  labels, notices, hero — okkoma.)
-- **📅 දිනය අනුව ප්‍රතිඵල** — 📋 අලුත්ම ප්‍රතිඵල tab එකේ calendar එකෙන් දිනයක්
-  තෝරාම **එදා හැම ලොතරැයියකගේම** ප්‍රතිඵલ. අතින් පරීක්ෂාවෙත් calendar එකක් තියෙනවා.
-- **⚡ QR detect —— හැම video frame එකේම** (`requestVideoFrameCallback`).
-  මනින ලද වේගය: **~120-140ms, frame 4-5ක් ඇතුළත** (කලින් `setInterval(260ms)`
-  නිසා තත්පර 0.26ක් බලා ඉන්න වුනා). හම්බුන ගමන් **vibration + chime +
-  ප්රතිඵලය**, ඊට පස්සේ **කලින්ම උණුසුම් කරපු** `speechSynthesis` එකෙන්
-  ශබ්දය (පළවෙනි වතාවේ ප්රමාදය මඟහැරෙන්න `prewarmSpeech()`).
-- **🔳 QR කියවීම මට්ටම් 3කින්** — 1) browser `BarcodeDetector` (Chrome/Android)
-  2) **jsQR** (pure JS — iPhone/Firefox ද වැඩ කරනවා) 3) Gemini (අපැහැදිලි QR).
-  කලින් තිබ්බේ (1) විතරයි — ඒ නිසා iPhone වල QR වැඩ කළේ නෑ.
-- **🚫 scan limit නෑ** — user කෙනෙකුට දවසට/මාසෙට scan ප්‍රමාණයක් නෑ.
-  (Abuse නවත්තන්න විනාඩියකට AI ඉල්ලීම් 20ක rate limit එකක් විතරයි තියෙන්නේ.)
-
-## 📁 Project structure
-
-```
-lk-lottery-master/
-├── server.js              ← Express API + check logic (listen කරන්නේ `node server.js` වලින් විතරයි)
-├── scraper.js             ← NLB (bot-check bypass එක්ක) + DLB scraper
-├── prizes.js              ← ඇත්ත NLB/DLB prize structure engine (lottery 16ටම)
-├── vision.js              ← AI scan — Gemini vision REST API
-├── auth.js                ← Register / Login / Google Sign-In / JWT
-├── billing.js             ← Plans, scan quota, PayHere checkout + notify
-├── stats.js               ← Check logging + user reports + admin analytics
-├── lucky.js               ← 🍀 "මගේ වාසනාව" — numerology + pattern analysis + AI guess
-├── lottery-meta.js        ← ලොතරැයි ව්‍යුහය (positional/set, ඉලක්කම්/අකුරු) එක තැනකින්
-├── gemini-keys.js         ← 🔑 API key pool — rotation + failover (+ cooldown/disable)
-├── scrape-runner.js       ← Auto-scrape cron + status (startup stale check එකත් එක්ක)
-├── draws-store.js         ← data.json → SQLite `draws` (මාස 6+ ඉතිහාසය, දිනය අනුව query)
-├── seo.js                 ← 🔎 Server-rendered SEO පිටු + sitemap + structured data
-├── db.js                  ← SQLite layer (better-sqlite3)
-├── env.js                 ← .env loader (dependency එකක් නැතුව)
-├── test.js                ← Automated tests 44ක් (`npm test`)
-├── test-gemini.js         ← Gemini API connectivity test (`npm run test:gemini`)
-├── data.json              ← Scrape කරපු ප්‍රතිඵල (auto-generate)
-├── data/                  ← SQLite DB (auto-generate, .gitignore කරලා)
-├── public/
-│   ├── index.html         ← සම්පූර්ණ frontend එක (HTML + CSS + JS එකේම)
-│   ├── app-icon.svg       ← App icon (vector)
-│   ├── icon-192.png       ← PWA icon
-│   ├── icon-512.png       ← PWA icon (maskable)
-│   ├── apple-touch-icon.png
-│   ├── favicon-32.png
-│   └── manifest.webmanifest
-├── .env.example           ← Environment variables template
-├── SETUP.md               ← Credentials setup guide (Gemini / Google / PayHere)
-├── HOWTO-TEST.md          ← Feature එකින් එක අතින් test කරන විදිය
-└── package.json
-```
-
----
-
-## ⚙️ npm scripts
-
-| Command | කරන්නේ මොකද |
-|---|---|
-| `npm start` | Server එක start කරනවා (port 3000, `.env` එකේ `PORT` එකෙන් වෙනස් කරන්න පුළුවන්) |
-| `npm run scrape` | NLB + DLB එකෙන් results scrape කරලා `data.json` ලියනවා |
-| `npm test` | Automated tests 44ක් (prize engine, check logic, real data) |
-| `npm run test:gemini` | Gemini API key + model එක වැඩ කරනවද බලනවා |
-| `npm run health` | Run වෙන server එකේ `/api/health` එක call කරනවා |
-
----
-
-## ✨ Features
-
-- **📷 කැමරා Scan (ප්‍රධාන ක්‍රියාව)** — tab row එකෙන් එළියේ තියෙන ලොකු CTA එකක්.
-  ඇතුළේ ප්‍රධාන button **3යි**: කැමරාවෙන් Scan · Phone එකේ camera app · Gallery.
-  ටිකට්පත්‍රය කැමරාවට ලං කරාම **auto-focus** (continuous AF + තත්පර 3කට වරක් නැවත
-  ලොක් කිරීම + preview එකේ ඔබාම tap-to-focus), රාමුවට **crop** (අනවශ්‍ය කොටස් යවන්නේ නෑ),
-  zoom slider + නිවැරදිව වැඩ කරන **🛑 නවත්තන්න** button එකක්.
-- **🍀 මගේ වාසනාව (Premium)** — නම + උපන් දිනය + උපන් වේලාව (AM/PM) දාලා, පසුගිය
-  ප්‍රතිඵලවල **සැබෑ සංඛ්‍යාලේඛන** (hot/cold/overdue, position-wise, එකතුව, අකුරු/රාශි
-  වාර ගණන) + සාම්ප්‍රදායික සංඛ්‍යා ශාස්ත්‍රීය සංඥා එකට එකතු කරලා AI අංක යෝජනාවක්.
-  කැමරාවෙන් scan කරලත් අනුමානය ගන්න පුළුවන්.
-  ⚠️ හැම උත්සාහයකටම කලින් **disclaimer එකට එකඟ වීම අනිවාර්යයි** (server එකෙනුත්
-  enforce කරනවා) — මෙය අනාවැකියක් නොවේ, ලොතරැයි අංක අහඹුයි.
-- **📢 Display ads** — ස්ථාන 7ක් (උඩ · scan · lucky · results · history · පහළ ·
-  check 3කට වරක් එන interstitial). Ad network එකේ code එක අදාළ තැනට paste කරන්න
-  විතරයි. Premium (adFree) plans වලට දැන්වීම් නොපෙනෙනවා.
-- **🔑 API key failover** — Gemini keys කිහිපයක් දැම්මොත් එකක් quota/limit එකට
-  වැටුනාම app එක **තනියම ඊළඟ key එකට මාරු වෙනවා** (cooldown + disabled keys
-  skip කරලා, භාරය සමානව බෙදලා). ඒ නිසා එක key එකක් ඉවර උනාම user ට 429 error
-  එකක් එන්නේ නෑ. Admin → Overview එකේ key එකක තත්ත්වය (masked) පේනවා.
-  ⚠️ *Free quota එක ගුණ කරන්න වෙන වෙන Google accounts හෝලා keys හදන එක
-  Google ToS කඩයි — ඒකට පාවිච්චි කරන්න එපා. Keys ඔබේම project/team එකේ
-  ඒවා විය යුතුයි.*
-- **⏳ අපරාදේ request නොයන එක** — button එකක් ඔබපුවම result එක එනකම් ඒක
-  **අළු පාට වෙලා disable** වෙනවා (Scan · පරීක්ෂා කරන්න · අනුමානය ඔක්කොම).
-  Frontend එක විතරක් නෙවෙයි — server එකෙනුත් එකම user එකෙන් එකවර යන AI
-  ඉල්ලීම් block කරනවා, ඒ නිසා Gemini calls නාස්ති වෙන්නේ නෑ.
-- **🔄 Auto-scrape** — දිනකට දෙපාරක් (09:30 + 21:30 Asia/Colombo) ස්වයංක්‍රීයව, ඒ වගේම
-  server එක start වෙද්දී දත්ත පරණ නම් background එකේ. Scrape එකක් අසාර්ථක උනොත්
-  පරණ දත්ත රැකෙනවා (හිස් වෙන්නේ නෑ). Admin ට manual refresh button එකකුත් තියෙනවා.
-- **✍️ අතින් Check** — lottery එකට අනුව box ගණන automatic වෙනස් වෙනවා
-  (අකුරු box, රාශි dropdown, super number box, multi-game selector), auto-advance cursor,
-  පරණ draw අංකයකින් වුනත් check කරන්න පුළුවන්.
-- **ඇත්ත prize amounts** — placeholder logic එකක් නෙවෙයි. lottery 16න් 15කට NLB/DLB
-  නිල prize structure table එකෙන්ම හදපු tier + Rs. amount logic එකක්.
-  (Waasi සහ Dhana Nidhanaya 9th tier — data නැති නිසා "check කරන්න බෑ" කියලා
-  පැහැදිලිව කියනවා, වැරදි answer එකක් දෙන්නේ නෑ.)
-- **📋 අද Results** — lottery 16ටම අලුත්ම draw + අංක. Item එකක් click කළාම
-  ඒ draw එකත් එක්ක Check tab එකට auto-fill වෙනවා.
-- **📷 AI Camera Scan** — photo එකක් Gemini vision එකට යවලා lottery නම, draw අංකය,
-  ඉලක්කම්, අකුර, රාශිය structured JSON එකක් විදිහට ගන්නවා. Photo එක ගත්තට පස්සේ
-  **scan වෙනවා වගේ animation** එකක් පේනවා, ඊට පස්සේ **එවලේම scrape කරපු ප්‍රතිඵලත්
-  එක්ක match කරලා** දිනුමක් තියෙනවා නම් tier එකයි Rs. amount එකයි එතනම පෙන්නනවා.
-  ඕන නම් "අතින් Check" එකට auto-fill කරන්නත් පුළුවන්.
-  Camera එකට continuous auto-focus + resolution 1920×1080 + ticket align කරන්න රාමුවක්,
-  සහ "🎯 නැවත Focus කරන්න" button එකක් තියෙනවා. Focus ප්‍රශ්න තියෙන phones වලට
-  "📱 Phone එකේ camera app එකෙන් ගන්න" කියලා වෙනම option එකකුත් තියෙනවා.
-- **🕘 History + 📊 Report** — ගිණුමක් නැතුව (guest) check කරන ඒවා browser එකේ
-  localStorage එකේ තියෙනවා. **ගිණුමකට login වුනාම** හැම check එකක්ම server එකේ save වෙලා:
-  - සම්පූර්ණ history එක — ලොතරැයිය / දින පරාසය / දිනුම් විතරක් කියන filter එක්ක + pagination
-  - **ලොතරැයි අනුව විස්තරාත්මක report එකක්** — එක එක ලොතරැයියට check කීයක්, දිනුම් කීයක්,
-    දිනුම් අනුපාතය, මුළු දිනුම් මුදල, අලුත්ම දිනුම, ලොකුම දිනුම — analysis කරන්න ලේසි විදිහට
-- **👤 ගිණුම** — Email/Password + **Google (Gmail) එකෙන් එක click එකකින් signup**.
-  Google One Tap එකේ `auto_select` දාලා තියෙන නිසා browser එකේ දැනටමත් login වෙලා ඉන්න
-  Gmail ගිණුම **auto-select වෙලා** එක click එකකින් ගිණුම හැදෙනවා/ලොග් වෙනවා.
-  Register වෙද්දී password එක දෙපාරක් අහනවා (typo වළක්වන්න) + 👁️ බලන්න button එකක්.
-  Plan එකින් scan quota, PayHere subscriptions (Rs. 100 / 500 / 1000).
-- **🛠️ Admin Panel** — `.env` එකේ `ADMIN_EMAILS` එකේ දාපු email වලට විතරයි:
-  - **ඔක්කොම signups** — එක එකාගේ plan, login ක්‍රමය (Google/Password), joined දිනය
-  - **එක එකාගේ statistics** — කීයක් search/check කළාද, දිනුම් කීයක්ද, අනුපාතය,
-    මුළු දිනුම් මුදල, AI scans කීයක්, අලුතෙන්ම active උන වෙලාව
-  - **per-user විස්තර** — ඒ user ගේ ලොතරැයි report එක + history + payments
-  - **Lottery report (හැම user ගේම)** — මුළු check, players, winners, දිනුම් මුදල, top tiers
-  - Daily signups / checks chart + අලුත්ම checks list එකක්
-- **💰 Ad break** — හැම 3වෙනි check එකකටම තත්පර 5ක ad screen එකක්
-  (`public/index.html` එකේ `id="adSlot"` එක ඇතුළේ AdSense code එක දාන්න).
-- **⏰ Auto scrape** — server එක run වෙලා තියෙනකොට හැම දිනකම උදේ **10:00 (Asia/Colombo)**
-  ට `scraper.js` auto run වෙනවා.
-
----
-
-## 🗄️ දත්ත
-
-| දේ | කොහෙද | ඇතුළේ මොනවද |
-|---|---|---|
-| `data.json` | ලොතරැයි ප්‍රතිඵල | lottery 16, draw 168ක් (scraper එකෙන් auto-generate) |
-| `data/app.db` | SQLite | `users`, `payments`, `checks` (check history + statistics) |
-
-**Privacy:** **scan කරන photo එක කවදාවත් save කරන්නේ නෑ** (එයා Gemini එකට ගිහින්
-ප්‍රතිඵලය එනවා විතරයි). ගිණුමක් නැතුව check කරන ඒවා browser එකේ විතරයි.
-**ගිණුමකට login වුනාම**, ඔබගේ check කිරීම් (ලොතරැයිය, draw, දිනය, ඉලක්කම් සහ ප්‍රතිඵලය)
-ඔබගේ report/history සහ admin statistics සඳහා server එකේ සුරකිනවා.
-
----
-
-## 🔑 Configuration (`.env`)
-
-`cp .env.example .env` කරලා පුරවන්න. සම්පූර්ණ setup steps → **[SETUP.md](SETUP.md)**.
-
-| Key | අවශ්‍යද | විස්තරය |
-|---|---|---|
-| `PORT` | නෑ | Server port (default `3000`) |
-| `APP_BASE_URL` | නෑ | PayHere return/notify URLs සඳහා |
-| `APP_TIMEZONE` | නෑ | Daily/monthly quota reset වෙන timezone (default `Asia/Colombo`) |
-| `TRUST_PROXY` | නෑ | nginx/Render වගේ proxy එකක් පිටුපස නම් `true` |
-| `JWT_SECRET` | ✅ **අනිවාර්යයි** | අකුරු 32+ random string. හදාගන්න: `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
-| `GEMINI_API_KEY` | AI scan එකට | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) — FREE |
-| `GEMINI_MODEL` | නෑ | default `gemini-3.6-flash` ([වෙන models](https://ai.google.dev/gemini-api/docs/models)) |
-| `GEMINI_TIMEOUT_MS` | නෑ | එක scan එකකට උපරිම තත්පර (default `45000`) |
-| `GEMINI_API_KEY_2`...`_N` | නෑ | අමතර keys — එකක් limit වුනාම ඊළඟ එකට මාරු වෙනවා (failover) |
-| `GEMINI_KEY_COOLDOWN_MS` | නෑ | 429 වුනාම ඒ key එක තත්පර කීයක් නවත්තනවද (default 60s) |
-| `GEMINI_KEY_DAILY_COOLDOWN_MS` | නෑ | දවසේ limit ඉවර key එකක් (default 30 min) |
-| `GEMINI_MAX_KEY_ATTEMPTS` | නෑ | එක ඉල්ලීමකට උපරිම keys කීයක් try කරන්නද (default 3) |
-| `SCRAPE_CRON` | නෑ | Auto-scrape කවදාද (default `30 9,21 * * *` — දිනකට දෙපාරක්) |
-| `SCRAPE_HISTORY_MONTHS` | නෑ | කොච්චර කාලයක් ප්‍රතිඵල ගන්නද (default `6`) |
-| `SCRAPE_NLB_DRAWS` | නෑ | NLB ලොතරැයියකට උපරිම draw ගණන (default `200`) |
-| `SCRAPE_DLB_MAX_PAGES` | නෑ | DLB pagination උපරිම පිටු (default `90`) |
-| `SCRAPE_MAX_AGE_HOURS` | නෑ | Server start වෙද්දී දත්ත මීට වඩා පරණ නම් scrape කරනවා (default `8`) |
-| `UNLIMITED_SCAN` | නෑ | `true` = scan limit එකක් නෑ. **දැනට `true`** (test කරන කාලෙට). Test ඉවර වුනාම `false` කරන්න — එතකොට plan limits ආපහු වැඩ කරනවා (counters දිගටම ගණන් වෙනවා) |
-| `GOOGLE_CLIENT_ID` | Google login එකට | OAuth 2.0 "Web application" client ID. දැම්මම **Gmail එකෙන් එක click signup** (One Tap auto-select) වැඩ කරනවා |
-| `ADMIN_EMAILS` | Admin panel එකට | Admin අවසර දෙන email එකක් හෝ කිහිපයක් (කොමාවෙන් වෙන් කරලා). උදා: `ADMIN_EMAILS=you@gmail.com` |
-| `GEMINI_THINKING` | නෑ | default `minimal` — scan එක ගොඩක් වේගවත් කරනවා. `off` දැම්මම thinking config එක යවන්නේම නෑ |
-| `PAYHERE_MERCHANT_ID` / `_SECRET` | Payments වලට | PayHere Merchant Portal එකෙන් |
-| `PAYHERE_MODE` | නෑ | `sandbox` (default) හෝ `live` |
-
----
-
-## 🔌 API
-
-| Method | Endpoint | කරන්නේ |
-|---|---|---|
-| GET | `/api/health` | Uptime + data status |
-| GET | `/api/lotteries` | Lottery list + display metadata (box ගණන, රාශි, sub-games) |
-| GET | `/api/results/:slug` | එක lottery එකක draw ඔක්කොම |
-| GET | `/api/latest` | අලුත්ම draw (හැම lottery එකකටම) |
-| POST | `/api/check` | `{ slug, drawNo?, letter?, zodiac?, superNumber?, numbers[], subGameIndex? }` |
-| POST | `/api/scan` | `{ image: <base64>, mimeType }` → AI vision |
-| POST | `/api/auth/register` | `{ email, password, name? }` |
-| POST | `/api/auth/login` | `{ email, password }` |
-| POST | `/api/auth/google` | `{ idToken }` |
-| GET | `/api/auth/me` | Bearer token → user (+ `isAdmin`) |
-| GET | `/api/me/stats` | මගේ summary (checks, දිනුම්, අනුපාතය, මුදල, ලොකුම දිනුම) |
-| GET | `/api/history` | මගේ සම්පූර්ණ history — `?slug=&from=&to=&winsOnly=true&limit=&offset=` |
-| GET | `/api/report` | මගේ ලොතරැයි අනුව විස්තරාත්මක report — `?from=&to=` |
-| GET | `/api/admin/overview` | **Admin:** totals, signups/checks by day, plan mix, recent checks |
-| GET | `/api/admin/users` | **Admin:** හැම signup එකක්ම + per-user statistics — `?q=&sort=&limit=&offset=` |
-| GET | `/api/admin/users/:id` | **Admin:** එක user කෙනෙක්ගේ සම්පූර්ණ විස්තර + report + history |
-| GET | `/api/admin/report` | **Admin:** ලොතරැයි අනුව සමස්ත report + top tiers |
-| GET | `/api/admin/setup` | Admin configure කරලා තියෙනවද / මගේ email එක (setup help) |
-| GET | `/api/draws/:slug` | Draw ලැයිස්තුව / `?date=YYYY-MM-DD` → ඒ දවසේ draw |
-| POST | `/api/check` | `date` දුන්නොත් **ඒ දවසේ ප්‍රතිඵලය** සමඟ සැසඳෙනවා |
-| GET | `/api/lucky/disclaimer` | 🍀 නියමයන් (disclaimer) text + version |
-| GET | `/api/profile` | මගේ උපන් විස්තර + සංඛ්‍යා ශාස්ත්‍රීය සංඥා |
-| POST | `/api/profile` | උපන් විස්තර save — `{fullName, birthday, birthHour, birthMinute, birthMeridiem}` |
-| GET | `/api/lucky/patterns` | 🍀 **Premium:** විශ්ලේෂණය + 🧮 ශ්‍රේණිගත ඉලක්කම් + ඊළඟ draw යෝජනාව — `?slug=&subGameIndex=` |
-| GET | `/api/lucky/overview` | 🍀 **Premium:** ලොතරැයි අනුව සාරාංශය (හැම ලොතරැයියකටම top අංක + යෝජනාව) — `?limit=6` |
-| POST | `/api/lucky/guess` | 🍀 **Premium:** AI අනුමානය — `agreedDisclaimer: 'v1'` අනිවාර්යයි |
-| GET | `/api/lucky/history` | 🍀 මගේ පෙර අනුමාන |
-| GET | `/api/scrape/status` | Auto-scrape තත්ත්වය (cron, අවසන් උත්සාහය, දත්ත අලුත්ද) |
-| POST | `/api/admin/scrape` | **Admin:** දැන්ම අතින් scrape එකක් run කරන්න |
-| GET | `/api/billing/plans` | Plans + current plan |
-| POST | `/api/billing/checkout` | PayHere checkout fields (auth ඕන) |
-| POST | `/api/billing/notify` | PayHere server-to-server callback (md5sig verify) |
-
-Auth ඕන endpoints වලට `Authorization: Bearer <token>` header එක යවන්න.
-
----
-
-## 🧪 Testing
+Browsers only expose the camera (`navigator.mediaDevices.getUserMedia`) on **https://**
+pages or on **localhost**. If you open the app on a phone over plain `http://192.168.x.x`
+the camera is blocked by Chrome, Edge, Safari and Firefox alike — the app now detects this
+and tells the user instead of failing silently.
 
 ```bash
-npm test              # 44 tests — Pass: 44 / Fail: 0
-npm run test:gemini   # Gemini key + model check
+npm run dev:https         # generates a self-signed cert (certs/) and serves over https
 ```
 
-### 🧮 ශ්‍රේණිගත කිරීමේ එන්ජිම (Lucky Guess algorithm)
+Then open `https://<your-computer-LAN-IP>:3000` on the phone and accept the certificate
+warning once.
 
-`lucky.js` එකේ `rankCandidates()` සහ `nextDrawPlan()` පසුගිය draws වලින්
-අංක **ශ්‍රේණිගත කරනවා** (score 0-100). බර:
+Useful commands:
 
-| සාධකය | බර | කරන්නේ |
+| Command | What it does |
+|---|---|
+| `npm run dev` | Development server (http://localhost:3000) |
+| `npm run dev:https` | Generates certs + development server over https (needed for phones) |
+| `npm run cert` | Only generate the self-signed certificate |
+| `npm test` | Parser / draw resolver / prize calculator self-test (57 checks) |
+| `npm run typecheck` | TypeScript check |
+| `npm run build` | Production build (`dist/`) |
+| `npm start` | Run the production build |
+
+---
+
+## Configuration (`.env`)
+
+```env
+GEMINI_API_KEY=""
+GEMINI_API_KEY_1=""
+GEMINI_API_KEY_2=""
+GEMINI_API_KEY_3=""
+GEMINI_API_KEY_4=""
+GEMINI_API_KEY_5=""
+```
+
+* All keys are combined into a **key pool**. They are used round-robin.
+* When a key returns a rate-limit / quota error it is put on an exponential cooldown
+  (60 s → 2 min → 4 min … capped at 15 min) and the next key is used automatically —
+  the user never sees an interruption and no restart is needed.
+* An invalid key is parked for 6 hours.
+* If every key is cooling down the API answers with a clear message telling you to retry
+  shortly, and the app shows which keys are cooling and for how long.
+* `GEMINI_MODELS` (optional) overrides the model chain; the default is
+  `gemini-3.8-flash` then `gemini-3.6-flash`. Model-not-found errors roll to the next model
+  with the same key, key errors roll to the next key.
+
+`GET /api/health` reports the pool state (`configuredKeys`, `models`, per-key cooldowns).
+
+---
+
+## What this version fixes
+
+### 1. QR scanning now works on Firefox, Chrome, Edge and Safari
+
+* **Secure-context detection.** If the camera API is unavailable (http:// origin, unsupported
+  browser) the scanner explains exactly why and what to do, instead of showing a dead view.
+* **Three decode engines, automatically selected:**
+  1. native `BarcodeDetector` (Chrome / Edge / Android, hardware accelerated),
+  2. `ZXing` (most tolerant with blurry, angled and low-contrast codes — code-split so it
+     does not slow the first page load),
+  3. `jsQR` (small pure-JS fallback that also reads inverted codes).
+* **Frame strategy tuned for speed:** every tick runs the central region at full resolution
+  (fastest when the ticket is held in the guide box) and cycles a full-frame downscaled pass
+  with inversion, so a code anywhere in view is picked up quickly.
+* **iOS Safari specifics:** `playsinline` + `muted` are set *before* `srcObject`, and
+  `play()` is called immediately after `getUserMedia` resolves so the element counts as
+  user-gesture initiated.
+* **Continuous autofocus**, optional torch, camera switch, zoom slider and tap-to-focus
+  (used when the platform supports them; silently skipped when it does not).
+* **Constraint ladder:** 1920×1080 → 1280×720 → facingMode only → any camera, so desktop
+  webcams and multi-camera phones both start.
+
+### 2. The camera stays on
+
+* The scanner component is **never unmounted** when you switch tabs (History, Manual Check…);
+  it is only hidden, so the stream is not torn down and restarted.
+* The result of a scan only **pauses decoding**; the stream keeps running.
+* Coming back from the background re-checks the stream and silently re-acquires it if the OS
+  killed the track.
+
+### 3. Win notice audio actually plays
+
+The old code created the `AudioContext` outside a user gesture, so browsers kept it
+`suspended` and every sound (including the win chime) was dropped.
+
+* Audio is **primed on the first tap anywhere**: the context is resumed, a silent buffer is
+  played (the documented unlock signal), speech synthesis is unlocked, and an `<audio>`
+  element is primed as well.
+* The scanner's **Start camera** button performs the unlock explicitly.
+* Every sound (win chime, lose tone, QR beep) runs through `ensureAudioRunning()` and falls
+  back to a generated WAV played by the primed `<audio>` element if WebAudio is still
+  blocked.
+* If a browser still refuses, the result modal replays the sound on the first tap inside it.
+* Speech announces the result, pronouncing `Rs.` as "Rupees" (Sinhala/Tamil variants included).
+
+### 4. Vibrate on QR detection, 5 second result, automatic next scan
+
+* Phone vibrates the moment a QR is decoded, plus a short beep and a green screen flash.
+* The result is shown for **5 seconds** with a countdown ring, then the scanner resumes by
+  itself, ready for the next ticket (pause/extend is available).
+* The same ticket never re-triggers while it is still in front of the camera.
+
+### 5. Ticket vs official result, side by side
+
+The result modal shows **"Numbers read from YOUR ticket"** and **"Official winning result"**
+as two separate rows, with every matching ball, letter, zodiac sign and super number
+highlighted, plus the matched-number summary and the matched prize tier.
+
+### 6. History with per-lottery and date-range statistics
+
+* Filters: lottery (or all), result (won / no win / all), date range (with Today / 7 days /
+  30 days / All time shortcuts).
+* Date basis switch: filter by **scan time** or by **draw date**.
+* Stat tiles: tickets checked, wins, no-win, win rate, total winnings, biggest win.
+* **Per-lottery breakdown table** (checked / wins / no-win / total won) for the selected
+  period, clickable to drill into one lottery.
+* Full record list with the ticket numbers, official numbers and the matched ones.
+* CSV export of the filtered set and clear-history.
+
+### 7. AI Scan button below the QR scanner
+
+When a QR will not scan (damaged, scratched, wet, folded) the AI reader:
+
+* can capture a still **directly from the camera that is already running** (no need to go
+  back to a menu),
+* also supports taking a photo or picking one from the gallery,
+* returns the same parsed shape as the QR scanner, so the result is scored, displayed and
+  recorded identically (win / no win, prize tier, history entry),
+* never invents data: if the AI cannot read the ticket it says so
+  (`cannotRead` → "Cannot read this ticket") instead of guessing.
+
+### 8. Govisetha date-matching bug — fixed
+
+This was the most dangerous bug: a ticket could be scored against an unrelated official draw.
+
+The new rule set:
+
+* The **draw number is the only authoritative key**. A date on the ticket never selects a draw
+  on its own while a draw number was read.
+* If the ticket's printed date disagrees with the matched draw's date, the draw number still
+  wins and a warning is shown.
+* If the draw number cannot be found in the downloaded results, the ticket is **not scored**.
+  The app says so, explains it and offers the nearest draws so the user can verify manually.
+* The date is only used as a fallback when **no draw number could be read at all**, and that
+  match is clearly labelled "matched by: date".
+* The date digits are stripped from the payload before ball numbers are extracted, so a date
+  can never leak into the number list.
+* Numbers and letters are never fabricated from the official draw (the old code filled missing
+  values with official numbers / `'W'` / `'17'`, which produced guaranteed false "wins").
+
+### 9. Correct handling of Sri Lankan ticket formats
+
+* 1-digit lotteries keep 1-digit balls (Mahajana Sampatha, NLB Jaya, Supiri Dhana Sampatha,
+  Jaya Sampatha, Ada Sampatha); 2-digit lotteries keep 2-digit balls.
+* Glued barcode digits are split correctly (`03182170` → `03-18-21-70`).
+* Draw numbers are compared with leading zeros normalised (`0890` = `890`).
+* Serial numbers, barcodes, ticket prices and dates are excluded from the ball list.
+* Payload formats supported: JSON, URLs with query parameters, `key=value` strings,
+  delimiter strings (`GS/4557/W/03-32-36-62/19092026`), base64-wrapped text.
+* The QR **payload inspector** in the scanner shows the raw decoded string, the engine that
+  decoded it, the decode rate, the browser and the detected flags — useful if a ticket
+  format ever needs reviewing.
+
+---
+
+## Prize structures implemented
+
+Verified against the official NLB / DLB structures:
+
+| Lottery | Notable rules |
+|---|---|
+| Govisetha | Letter + 4 → Rs 60M; 4 → 2M; letter+3 → 250,000; 3 → 5,000; letter+2 → 2,000; 2 → 200; letter+1 → 200; 1 → 40; letter → 40 |
+| Dhana Nidhanaya | Letter + 4 → Rs 80M; 4 → 2M; letter+3 → 200,000; 3 → 6,000; letter+2 → 2,000; 2 → 200; letter+1 → 120; 1 → 40; letter → 40 |
+| Mega Power | Letter + super + 4 → Rs 150M; letter+4 → 10M; super+4 → motor car; 4 → 2M; letter+3 → 200,000; 3 → 5,000; letter+2 → 2,000; 2 → 200; letter+1 → 200; 1 → 40; letter → 40; super → 40 |
+| Handahana | Zodiac + 4 → Rs 3M; 4 → 1M; zodiac+3 → 25,000; 3 → 2,000; zodiac+2 → 500; 2 → 200; zodiac+1 → 120; 1 → 40; zodiac → 40 |
+| Mahajana Sampatha | Letter + 6 → Rs 20M; 6 → 2.5M; last/first 5 → 100,000; last 4 → 15,000; first 4 → 2,000; last 3 → 2,000; first 3 → 200; last 2 → 200; first 2 → 80; last/first 1 → 40; letter → 40 |
+| Ada Sampatha | 2 → 1,000; 3 → 4,000; 4 → 50,000; 4 + letter → 250,000; letter → 80 |
+| NLB Jaya | Letter + 4 → 500,000; 4 → 50,000; last 3 → 2,000; first 3 → 200; last 2 → 200; first 2 → 80; last/first 1 → 40; letter → 40 |
+| Suba Dawasak | Zodiac + 3 → 500,000; 3 → 50,000; zodiac+2 → 2,500; 2 → 1,000; zodiac+1 → 200; 1 → 40; zodiac → 40 |
+| Ada Kotipathi / Shanida | 4 + letter → 50M; 4 → 2M; 3 + letter → 200,000; 3 → 4,000; 2 + letter → 2,000; 2 → 200; 1 + letter → 200; 1 → 40; letter → 40 |
+| Lagna Wasana | 4 + zodiac → 3M; 4 → 1M; 3 + zodiac → 20,000; 3 → 2,000; 2 + zodiac → 400; 2 → 200; 1 + zodiac → 120; 1 → 40; zodiac → 40 |
+| Supiri Dhana Sampatha | 6 + letter → 20M; 6 → 2.5M; last 5/first 5 → 100,000; last 4 → 20,000; first 4 → 2,000; last 3 → 2,000; first 3 → 200; last 2 → 200; first 2 → 120; last/first 1 → 40; letter → 40; all 6 any order → 500 |
+| Super Ball | 4 + letter → 50M; 4 → 2M; 3 + letter → 200,000; 3 → 4,000; 2 + letter → 2,000; 2 → 200; 1 + letter → 200; 1 → 40; letter → 40 |
+| Kapruka | 4 + letter + super → 150M; 4 + letter → 10M; 4 + super → 10M; 4 → 2M; 3 + letter → 200,000; 3 → 4,000; 2 + letter → 2,000; 2 → 200; 1 + letter → 200; 1 → 40; letter → 40; super → 40 |
+| Waasi | 2 + letter + super → 1M; 2 + letter → 500,000; 2 + super → 50,000; 2 → 25,000; 1 + super + letter → 1,000; 1 + letter → 500; 1 + super → 500; super + letter → 120; 1 → 40; letter → 40; super → 40 |
+| Sasiri | 3 → 200,000; 2 → 400; 1 → 40 |
+| Jaya Sampatha | 4 back-to-forward + letter → 250,000; 4 → 50,000; 3 → 4,000; 2 → 1,000; letter → 80 |
+
+`npm test` asserts the most important of these end to end.
+
+---
+
+## Project layout
+
+```
+server.ts                     Express + Vite server, Gemini key pool, /api/scan, /api/health
+src/App.tsx                   Scan pipeline: parse → resolve draw → evaluate → present → history
+src/components/QRScanner.tsx  Live camera scanner (start gate, torch, zoom, AI button, inspector)
+src/components/ScanResultModal.tsx
+src/components/AiTicketScanner.tsx
+src/components/HistoryView.tsx
+src/utils/qrParser.ts         Multi-format QR payload parser (never invents data)
+src/utils/drawResolver.ts     Binds a ticket to an official draw — refuses to guess
+src/utils/decoders.ts         BarcodeDetector + ZXing + jsQR, ROI/downscale helpers
+src/utils/cameraUtils.ts      Cross-browser camera constraints, torch, zoom, focus, capture
+src/utils/audioFeedback.ts    Audio unlock, tones, vibration, speech
+src/utils/prizeCalculator.ts  Official prize rules
+src/data/rawLotteriesData.json Official draw results
+scripts/self-test.ts          57 assertions (npm test)
+scripts/make-cert.mjs         Self-signed certificate generator
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause / fix |
+|---|---|
+| "Camera blocked on this connection" | The page is http:// — run `npm run dev:https` (or use localhost). |
+| Camera works in Firefox but not Chrome/Edge/Safari | Same secure-context rule; Chrome/Edge/Safari hide the API entirely on http://. |
+| Camera permission denied | Re-allow it in the browser's site settings (iOS: Settings → Safari → Camera), then Retry. |
+| "The camera is already in use" | Another tab/app holds the camera — close it and tap Retry. |
+| Scanning is slow | Check the decode rate in the QR payload inspector (4–15/s is normal). Use the zoom slider or the flash on glossy tickets. |
+| No sound on a win | Tap anywhere once — that unlocks audio on iOS/Chrome; the setting persists for the session. Check the speaker toggle in the header. |
+| iPhone does not vibrate | iOS Safari does not implement the vibration API. The camera flash + beep + on-screen result are the feedback there. |
+| "Cannot read this ticket" | The AI refused rather than guessed. Retake the photo with more light, or use Manual Check. |
+| Every AI scan says keys are cooling down | All keys are rate-limited; wait for the cooldown shown in `/api/health`, or add more keys. |
+| A ticket says "not scored / pick the draw" | The ticket's draw number is not in the downloaded results. Pick the draw manually in the result modal — the ticket is deliberately not scored against a wrong draw. |
+```
+
+---
+
+## Why the ticket QR is hard to scan (and how it is solved)
+
+The QR printed on a Sri Lankan lottery ticket is **tiny**. Feeding a full camera
+frame straight to jsQR / BarcodeDetector leaves roughly **1-2 pixels per QR
+module**, and no decoder on earth can read that. This looked like "the camera
+will not focus / the image is blurry", but it was a pixel-density problem.
+
+`public/qr-decode.js` (exposed as `window.LKMQR`) is a purpose-built pipeline:
+
+| Step | Function | What it does |
 |---|---|---|
-| වාර ගණන (frequency) | 34% | කී draw එකක ආවද |
-| මෑතකාලීනත්වය (recency) | 26% | exponential decay (half-life `LUCKY_HALFLIFE`, default 25) |
-| හිඩැස (overdue) | 18% | බලාපොරොත්තු වන හිඩැසට සාපේක්ෂව |
-| සංක්‍රමණය (transition) | 14% | අලුත්ම draw එකට සමාන ඓතිහාසික තත්ත්වවලින් පස්සේ ආපු අංක (Markov) |
-| සංඛ්‍යා ශාස්ත්‍රය | 8% | user ගේ profile එකේ ඉලක්කම් වලට ගැලපීම (profile නැත්නම් බලපෑම 0) |
+| 1 | `locateFinders()` | Finds the 1:1:3:1:1 finder pattern and **measures how many pixels one QR module currently occupies** |
+| 2 | `preprocessVariants()` | Percentile contrast stretch + unsharp mask + Otsu / adaptive (Bradley) binarisation, both polarities |
+| 3 | `decodeLattice()` | Tries a lattice of **scales x variants x polarity**. jsQR only succeeds when a module is ~3-10 px, so images are rescaled both up and down before decoding |
+| 4 | `stackAverage()` | Averages several aligned frames to cut noise ("super-resolution lite") |
 
-⚠️ **මේවා අපේ තේරීම්** — ලොතරැයි විශේෂඥයින් තහවුරු කළ පරාමිති නොවේ.
-ලොතරැයි අංක අහඹුයි; මේ එන්ජිම දිනුම් සම්භාවිතාව වැඩි කරන්නේ **නෑ** —
-පාරදෘශ්‍ය විශ්ලේෂණ මෙවලමක් විතරයි.
+The scanner therefore runs four strategies in rotation every tick:
 
-`npm test` එකෙන් cover කරන්නේ: date parsing, check logic (positional + set match),
-scraped data integrity, සහ **lottery 16ටම ඇත්ත prize tiers** (SUPER / 3RD / 4TH / ... amounts).
-Feature එකින් එක අතින් test කරන පියවර-by-පියවර guide එක → **[HOWTO-TEST.md](HOWTO-TEST.md)**.
+1. native `BarcodeDetector` on the live video element
+2. central ROI at native resolution (`decodeFast`)
+3. whole frame downscaled (`decodeFast`)
+4. **the full LKMQR lattice** — the one that actually reads the small ticket QR
 
----
+The measured `px/module` value is shown live above the viewfinder with real
+advice ("move closer" / "move back" / "hold still"), so a failed scan always has
+a visible reason.
 
-## 🚀 Deploy කරන්න
+### Testing
 
-1. `JWT_SECRET` එක strong random එකක් දාන්න (අනිවාර්යයි).
-2. `APP_BASE_URL` එක ඔයාගේ domain එකට දාන්න, `TRUST_PROXY=true` (proxy පිටුපස නම්).
-3. HTTPS පාවිච්චි කරන්න — phone එකකින් camera scan කරන්න ඕන නම් **HTTPS අනිවාර්යයි**
-   (browser එක `localhost` එකට විතරයි HTTPS නැතුව camera එක දෙන්නේ).
-4. Serverless / short-lived process එකක deploy කරනවා නම් `node-cron` schedule එක
-   reliable නෑ — OS-level cron එකකින් `npm run scrape` run කරන්න.
-5. AdSense approve වුනාට පස්සේ code එක `public/index.html` එකේ `id="adSlot"` ඇතුළේ දාන්න,
-   සහ `ads.txt` එක domain root එකට දාන්න.
-
----
-
-## ⚠️ වගකීම් ප්‍රතික්ෂේප කිරීම
-
-මේ app එකේ ප්‍රතිඵල NLB/DLB නිල වෙබ් අඩවි වලින් automatic ලෙස scrape කරන ඒවා —
-**නිල ප්‍රතිඵල පත්‍රිකාවක් නොවේ**. Prize amounts නිල prize structure එකෙන් ගත්තත්,
-අවසන් තීරණයක් ගන්න කලින් නිල ලේඛනයෙන් තහවුරු කරගන්න. AI scan එකෙන් වැරදි
-කියවීම් වෙන්න පුළුවන් — හැමවෙලාවෙම අංක නැවත බලන්න.
+See **[TESTING-SI.md](TESTING-SI.md)** for the full step-by-step test plan
+(Sinhala), including the HTTPS requirement, the colour-coded QR size meter, the
+admin panel checks and the results-import checks.
